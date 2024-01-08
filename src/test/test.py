@@ -1,3 +1,10 @@
+# -*- coding:utf-8 -*-
+"""
+    @Time  : 2021/11/10  13:55
+    @Author: Feng Lepeng
+    @File  : test.py
+    @Desc  :
+"""
 from src.wechat import *
 
 wx = WeChat()
@@ -10,13 +17,13 @@ def test_get_seeion_list():
 
 def test_get_message():
     # 输出当前聊天窗口聊天消息,倒叙输出
-    message_list = wx.get_all_message()
+    message_list = wx.get_message()
     for msg in message_list:
         print("%s : %s" % (msg[0], msg[1]))
 
     # 获取更多聊天记录
     wx.load_more_message(10)
-    message_list = wx.get_all_message()
+    message_list = wx.get_message()
     for msg in message_list:
         print("%s : %s" % (msg[0], msg[1]))
 
@@ -55,6 +62,7 @@ def test_send_picture():
 
 
 if __name__ == "__main__":
+    test_get_message()
     # test_send_message()
     # test_send_multiple_message()
-    test_send_picture()
+    # test_get_history_message()

@@ -1,8 +1,15 @@
-# -*- coding: utf-8 -*-
+# -*- coding:utf-8 -*-
+"""
+    @Time  : 2021/11/10  13:55
+    @Author: Feng Lepeng
+    @File  : wechat.py
+    @Desc  :
+"""
 import os
 import time
 import win32gui
 import win32con
+import re
 
 from io import BytesIO
 import pyscreenshot as shot
@@ -18,48 +25,6 @@ class WeChatParam:
 
 
 class WeChatUtil:
-    @staticmethod
-    def get_message_infos(Item, msg_list=None):
-        """
-        循环获取消息
-        """
-        msg_list = msg_list if msg_list is not None else list()
-        if len(Item.GetChildren()) == 0:
-            msg_list.append(Item.Name)
-        else:
-            for i in Item.GetChildren():
-                WeChatUtil.get_message_infos(i, msg_list)
-        return [i for i in msg_list if i]
-
-    @staticmethod
-    def format_message(MsgItem):
-        uia.SetGlobalSearchTimeout(0)
-        MessageInfos = WeChatUtil.get_message_infos(MsgItem)
-        MsgItemName = MsgItem.Name
-        if MsgItem.BoundingRectangle.height() == WeChatParam.SYS_TEXT_HEIGHT:
-            Msg = ('SYS', MsgItemName, MessageInfos)
-        elif MsgItem.BoundingRectangle.height() == WeChatParam.TIME_TEXT_HEIGHT:
-            Msg = ('Time', MsgItemName, MessageInfos)
-        elif MsgItem.BoundingRectangle.height() == WeChatParam.RECALL_TEXT_HEIGHT:
-            if '撤回' in MsgItemName:
-                Msg = ('Recall', MsgItemName, MessageInfos)
-            else:
-                Msg = ('SYS', MsgItemName, MessageInfos)
-        else:
-            Index = 1
-            User = MsgItem.ButtonControl(foundIndex=Index)
-            try:
-                while True:
-                    if User.Name == '':
-                        Index += 1
-                        User = MsgItem.ButtonControl(foundIndex=Index)
-                    else:
-                        break
-                Msg = (User.Name, MsgItemName, MessageInfos)
-            except:
-                Msg = ('SYS', MsgItemName, MessageInfos)
-        uia.SetGlobalSearchTimeout(10.0)
-        return Msg
 
     @staticmethod
     def copy_to_clipboard(data, dtype='text'):
@@ -99,10 +64,52 @@ class WeChatUtil:
         print(im)
         return im
 
+    @staticmethod
+    def format_message(message_item):
+        """
+        格式化消息
+        :param message_item:
+        :return:
+        """
+
+        def judge_type(message):
+            if '撤回' in message:
+                ret = ('Recall', message)
+            elif re.findall("[0-9]{1,2}:[0-9]{1,2}", message):
+                ret = ('Time', message)
+            else:
+                ret = ('SYS11', message)
+            return ret
+
+        uia.SetGlobalSearchTimeout(0)
+        message_item_name = message_item.Name
+        if message_item.BoundingRectangle.height() == WeChatParam.SYS_TEXT_HEIGHT:
+            ret = judge_type(message_item_name)
+        elif message_item.BoundingRectangle.height() == WeChatParam.TIME_TEXT_HEIGHT:
+            ret = ('Time', message_item_name)
+        elif message_item.BoundingRectangle.height() == WeChatParam.RECALL_TEXT_HEIGHT:
+            ret = judge_type(message_item_name)
+        else:
+            index = 1
+            tmp = message_item.ButtonControl(foundIndex=index)
+            try:
+                while True:
+                    if tmp.Name == '':
+                        index += 1
+                        tmp = message_item.ButtonControl(foundIndex=index)
+                    else:
+                        break
+                ret = (tmp.Name, message_item_name)
+            except:
+                ret = judge_type(message_item_name)
+        uia.SetGlobalSearchTimeout(10.0)
+        return ret
+
 
 class WeChat:
     def __init__(self):
         self.window = uia.WindowControl(ClassName='WeChatMainWndForPC')
+        self.histroy_window = uia.WindowControl(ClassName='FileManagerWnd')
         self.session_control = self.window.ListControl(Name='会话')
         self.search_control = self.window.EditControl(Name='搜索')
         self.MsgList = self.window.ListControl(Name='消息')
@@ -130,25 +137,34 @@ class WeChat:
         获取当前窗口中最后一条聊天记录
         """
         uia.SetGlobalSearchTimeout(1.0)
-        MsgItem = self.MsgList.GetChildren()[-1]
-        Msg = WeChatUtil.format_message(MsgItem)
+        message_item = self.MsgList.GetChildren()[-1]
+        Msg = WeChatUtil.format_message(message_item)
         uia.SetGlobalSearchTimeout(10.0)
         return Msg
 
-    def load_more_message(self, batch):
+    def load_more_message(self, wheel_times):
         """
         定位到当前聊天页面，并往上滚动鼠标滚轮，加载更多聊天记录到内存
         """
-        n = 1 if batch < 0.1 else batch
-        self.MsgList.WheelUp(wheelTimes=int(batch), waitTime=0.01)
+        n = 1 if wheel_times < 0.1 else wheel_times
+        self.MsgList.WheelUp(wheelTimes=int(wheel_times), waitTime=0.01)
 
-    def get_all_message(self):
+    def get_history_message(self):
+        item_list = self.histroy_window.ListControl(Name="全部")
+        print(item_list.Name)
+        item = item_list.ListItemControl()
+        print(item.Name)
+        for i in range(100):
+            print(item.TextControl().Name)
+            item = item.GetNextSiblingControl()
+
+    def get_message(self):
         """
         获取当前窗口中加载的所有聊天记录
         """
         message_list = []
         for message in self.MsgList.GetChildren():
-            message_list.append(WeChatUtil.SplitMessage(message))
+            message_list.append(WeChatUtil.format_message(message))
         return message_list
 
     def search(self, keyword):
@@ -273,3 +289,8 @@ class WeChat:
         WeChatUtil.copy_to_clipboard(ret_image, 'image')
         return True
 
+
+if __name__ == '__main__':
+    wx = WeChat()
+    ret = wx.get_session_list()  # 获取会话列表
+    print("当前的会话列表：{}".format(ret))

@@ -131,3 +131,7 @@ dmypy.json
 
 # log
 *Log.txt
+logs/
+
+# other
+test/test_get_id_card.py
