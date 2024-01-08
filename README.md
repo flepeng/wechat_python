@@ -37,7 +37,7 @@
 
 4.  获取当前会话列表结果
 
-    ![](/docs/imgs/01.png)
+    ![](./docs/imgs/01.png)
 
 5.  其他功能都在 `src/wechat.py` 文件中。 
 
